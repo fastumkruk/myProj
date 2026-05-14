@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { enqueueOfflineOp, subscribeOfflineApplied } from "@/lib/offlineQueue";
+import { isLikelyOfflineError, isOfflineNow } from "@/lib/offlineUtils";
 import type { ShoppingItem } from "@/types/models";
+import { useToastStore } from "@/stores/toastStore";
 
 function sortItems(next: ShoppingItem[]) {
   return next.sort((a, b) => {
@@ -34,6 +37,11 @@ export function useItems(
   const [error, setError] = useState<string | null>(null);
   const userId = opts?.userId;
   const onRemoteChange = opts?.onRemoteChange;
+  const pushToast = useToastStore((s) => s.push);
+
+  const makeLocalId = useMemo(() => {
+    return () => `local_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }, []);
 
   const refetch = useCallback(async () => {
     if (!supabase || !listId) return;
@@ -117,12 +125,49 @@ export function useItems(
     };
   }, [listId, userId, onRemoteChange]);
 
+  useEffect(() => {
+    if (!listId) return;
+    return subscribeOfflineApplied((e) => {
+      const r: any = e.result;
+      if (!r || r.kind !== "items.add") return;
+      if (r.listId !== listId) return;
+      const tempId: string = r.tempId;
+      const serverId: string = r.serverId;
+      if (!tempId || !serverId) return;
+      setItems((current) => current.map((i) => (i.id === tempId ? { ...i, id: serverId } : i)));
+    });
+  }, [listId]);
+
   const addItem = useCallback(
     async (title: string) => {
       if (!supabase || !listId) return null;
       setError(null);
       const position = items.filter((i) => !i.is_checked).length;
       const now = new Date().toISOString();
+      if (isOfflineNow()) {
+        const tempId = makeLocalId();
+        const row: ShoppingItem = {
+          id: tempId,
+          list_id: listId,
+          title: title.trim(),
+          position,
+          is_checked: false,
+          updated_by: userId ?? null,
+          created_at: now,
+          updated_at: now,
+        };
+        setItems((current) => sortItems([...current, row]));
+        enqueueOfflineOp("items.add", {
+          tempId,
+          listId,
+          title: title.trim(),
+          position,
+          updatedAt: now,
+          updatedBy: userId ?? null,
+        });
+        pushToast("Офлайн: добавил в очередь синхронизации");
+        return row;
+      }
       const { data, error } = await supabase
         .from("items")
         .insert({ list_id: listId, title: title.trim(), position, updated_at: now, updated_by: userId ?? null })
@@ -130,12 +175,36 @@ export function useItems(
         .single();
 
       if (error) {
+        if (isLikelyOfflineError(error.message)) {
+          const tempId = makeLocalId();
+          const row: ShoppingItem = {
+            id: tempId,
+            list_id: listId,
+            title: title.trim(),
+            position,
+            is_checked: false,
+            updated_by: userId ?? null,
+            created_at: now,
+            updated_at: now,
+          };
+          setItems((current) => sortItems([...current, row]));
+          enqueueOfflineOp("items.add", {
+            tempId,
+            listId,
+            title: title.trim(),
+            position,
+            updatedAt: now,
+            updatedBy: userId ?? null,
+          });
+          pushToast("Офлайн: добавил в очередь синхронизации");
+          return row;
+        }
         setError(error.message);
         return null;
       }
 
       const row = data as ShoppingItem;
-      setItems((current) => [...current, row]);
+      setItems((current) => sortItems([...current, row]));
       return row;
     },
     [listId, items, userId],
@@ -155,6 +224,16 @@ export function useItems(
         .update({ is_checked: isChecked, updated_at: now, updated_by: userId ?? null })
         .eq("id", itemId);
       if (error) {
+        if (isLikelyOfflineError(error.message)) {
+          enqueueOfflineOp("items.toggle", {
+            itemId,
+            isChecked,
+            updatedAt: now,
+            updatedBy: userId ?? null,
+          });
+          pushToast("Офлайн: сохраню изменение позже");
+          return;
+        }
         setError(error.message);
         await refetch();
       }
@@ -167,31 +246,65 @@ export function useItems(
       if (!supabase || !listId) return;
       setError(null);
       const now = new Date().toISOString();
+      setItems((current) =>
+        current.map((i) => (i.id === itemId ? { ...i, title: title.trim(), updated_at: now, updated_by: userId ?? null } : i)),
+      );
       const { error } = await supabase
         .from("items")
         .update({ title: title.trim(), updated_at: now, updated_by: userId ?? null })
         .eq("id", itemId);
-      if (error) setError(error.message);
+      if (error) {
+        if (isLikelyOfflineError(error.message)) {
+          enqueueOfflineOp("items.rename", {
+            itemId,
+            title: title.trim(),
+            updatedAt: now,
+            updatedBy: userId ?? null,
+          });
+          pushToast("Офлайн: сохраню изменение позже");
+          return;
+        }
+        setError(error.message);
+        await refetch();
+      }
     },
-    [listId, userId],
+    [listId, userId, refetch],
   );
 
   const deleteItem = useCallback(
     async (itemId: string) => {
       if (!supabase || !listId) return;
       setError(null);
+      setItems((current) => current.filter((i) => i.id !== itemId));
       const { error } = await supabase.from("items").delete().eq("id", itemId);
-      if (error) setError(error.message);
+      if (error) {
+        if (isLikelyOfflineError(error.message)) {
+          enqueueOfflineOp("items.delete", { itemId });
+          pushToast("Офлайн: удаление в очереди");
+          return;
+        }
+        setError(error.message);
+        await refetch();
+      }
     },
-    [listId],
+    [listId, refetch],
   );
 
   const clearChecked = useCallback(async () => {
     if (!supabase || !listId) return;
     setError(null);
+    setItems((current) => current.filter((i) => !i.is_checked));
     const { error } = await supabase.from("items").delete().eq("list_id", listId).eq("is_checked", true);
-    if (error) setError(error.message);
-  }, [listId]);
+    if (error) {
+      if (isLikelyOfflineError(error.message)) {
+        enqueueOfflineOp("items.clearChecked", { listId });
+        pushToast("Офлайн: очистка купленных в очереди");
+        return;
+      }
+      setError(error.message);
+      await refetch();
+    }
+  }, [listId, refetch, pushToast]);
 
   return {
     items,

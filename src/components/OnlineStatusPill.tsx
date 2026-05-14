@@ -1,8 +1,10 @@
-import { Cloud, CloudOff } from "lucide-react";
+import { Cloud, CloudOff, RefreshCw } from "lucide-react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useOfflineQueue } from "@/hooks/useOfflineQueue";
 
 export default function OnlineStatusPill() {
   const { isOnline } = useOnlineStatus();
+  const { pendingCount, isFlushing } = useOfflineQueue();
 
   return (
     <div
@@ -14,8 +16,9 @@ export default function OnlineStatusPill() {
       ].join(" ")}
     >
       {isOnline ? <Cloud className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
+      {isFlushing ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : null}
       {isOnline ? "Онлайн" : "Офлайн"}
+      {pendingCount > 0 ? `· ${isFlushing ? "синк" : pendingCount} в очереди` : null}
     </div>
   );
 }
-

@@ -1,5 +1,5 @@
 import { Bell, LogOut, Plus, RefreshCw } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppShell from "@/components/AppShell";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -16,7 +16,22 @@ export default function Lists() {
   const householdId = useAuthStore((s) => s.householdId);
   const signOut = useAuthStore((s) => s.signOut);
   const toast = useToastStore((s) => s.push);
-  const { lists, isLoading, error, createList, renameList, deleteList, refetch } = useLists(householdId);
+  const lastRemoteAt = useRef<number>(0);
+  const { lists, isLoading, error, createList, renameList, deleteList, refetch } = useLists(householdId, {
+    onRemoteChange: () => {
+      const now = Date.now();
+      if (now - lastRemoteAt.current < 1500) return;
+      lastRemoteAt.current = now;
+      toast("Списки обновились");
+      if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {
+        try {
+          new Notification("Списки покупок", { body: "Списки обновились" });
+        } catch (e) {
+          void e;
+        }
+      }
+    },
+  });
 
   const [newTitle, setNewTitle] = useState("");
   const [isBusy, setIsBusy] = useState(false);

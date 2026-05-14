@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
+import { initOfflineQueue } from "@/lib/offlineQueue";
+import { createOfflineExecutor } from "@/lib/offlineExecutor";
 
 export default function AuthGate({ children }: { children: ReactNode }) {
   const status = useAuthStore((s) => s.status);
@@ -9,6 +11,11 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     void init();
   }, [init]);
+
+  useEffect(() => {
+    if (status !== "ready") return;
+    initOfflineQueue(createOfflineExecutor());
+  }, [status]);
 
   if (status !== "ready") {
     return (
