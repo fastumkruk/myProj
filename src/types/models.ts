@@ -12,8 +12,8 @@ export type ShoppingItem = {
   title: string;
   is_checked: boolean;
   position: number;
+  price?: number | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
 };
-

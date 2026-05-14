@@ -11,6 +11,7 @@ import Input from "@/components/ui/Input";
 import Surface from "@/components/ui/Surface";
 import { useItems } from "@/hooks/useItems";
 import { addToItemHistory, getItemSuggestions } from "@/lib/itemHistory";
+import { subscribeOfflineApplied } from "@/lib/offlineQueue";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { useToastStore } from "@/stores/toastStore";
@@ -36,7 +37,7 @@ export default function ListDetails() {
     }
   };
 
-  const { items, isLoading, error, addItem, toggleItem, renameItem, deleteItem, clearChecked, refetch } = useItems(
+  const { items, isLoading, error, addItem, toggleItem, renameItem, setItemPrice, deleteItem, clearChecked, refetch } = useItems(
     listId ?? null,
     { userId, onRemoteChange },
   );
@@ -55,11 +56,28 @@ export default function ListDetails() {
   useEffect(() => {
     const run = async () => {
       if (!supabase || !listId) return;
-      const { data } = await supabase.from("lists").select("title").eq("id", listId).maybeSingle();
-      if (data?.title) setListTitle(data.title);
+      try {
+        const { data } = await supabase.from("lists").select("title").eq("id", listId).maybeSingle();
+        if (data?.title) setListTitle(data.title);
+      } catch {
+        void 0;
+      }
     };
     void run();
   }, [listId]);
+
+  useEffect(() => {
+    if (!listId) return;
+    return subscribeOfflineApplied((e) => {
+      const r: any = e.result;
+      if (!r || r.kind !== "lists.create") return;
+      if (r.tempId !== listId) return;
+      const serverId: string = r.serverId;
+      if (!serverId) return;
+      toast("Список синхронизирован");
+      navigate(`/lists/${serverId}`, { replace: true });
+    });
+  }, [listId, navigate, toast]);
 
   const canAdd = useMemo(() => newItemTitle.trim().length >= 1, [newItemTitle]);
   const suggestions = useMemo(() => getItemSuggestions(newItemTitle), [newItemTitle]);
@@ -90,6 +108,22 @@ export default function ListDetails() {
     const ok = window.confirm("Удалить товар?");
     if (!ok) return;
     await deleteItem(itemId);
+  };
+
+  const onPrice = async (itemId: string, current: number | null | undefined) => {
+    const raw = window.prompt("Сколько нужно на товар? (руб)", current == null ? "" : String(current));
+    if (raw == null) return;
+    const nextRaw = raw.trim();
+    if (!nextRaw) {
+      await setItemPrice(itemId, null);
+      return;
+    }
+    const value = Number(nextRaw.replace(",", "."));
+    if (!Number.isFinite(value) || value < 0) {
+      toast("Некорректная сумма");
+      return;
+    }
+    await setItemPrice(itemId, value);
   };
 
   const onClearChecked = async () => {
@@ -184,6 +218,7 @@ export default function ListDetails() {
                       key={item.id}
                       item={item}
                       onToggle={(checked) => void toggleItem(item.id, checked)}
+                      onPrice={() => void onPrice(item.id, item.price)}
                       onRename={() => void onRename(item.id, item.title)}
                       onDelete={() => void onDelete(item.id)}
                     />
@@ -203,6 +238,7 @@ export default function ListDetails() {
                       key={item.id}
                       item={item}
                       onToggle={(checked) => void toggleItem(item.id, checked)}
+                      onPrice={() => void onPrice(item.id, item.price)}
                       onRename={() => void onRename(item.id, item.title)}
                       onDelete={() => void onDelete(item.id)}
                     />

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { enqueueOfflineOp } from "@/lib/offlineQueue";
 import { isLikelyOfflineError, isOfflineNow } from "@/lib/offlineUtils";
+import { getCachedLists, setCachedLists, migrateItemsCache } from "@/lib/localCache";
 import type { ShoppingList } from "@/types/models";
 import { useToastStore } from "@/stores/toastStore";
+import { subscribeOfflineApplied, setOfflineIdMap } from "@/lib/offlineQueue";
 
 type State = {
   lists: ShoppingList[];
@@ -41,13 +43,33 @@ export function useLists(
 
       if (error) {
         setError(error.message);
+        if (isLikelyOfflineError(error.message)) {
+          setLists(getCachedLists(householdId));
+        }
         return;
       }
-      setLists((data ?? []) as ShoppingList[]);
+      const next = (data ?? []) as ShoppingList[];
+      setLists(next);
+      setCachedLists(householdId, next);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      setLists(getCachedLists(householdId));
     } finally {
       setIsLoading(false);
     }
   }, [householdId]);
+
+  useEffect(() => {
+    if (!householdId) return;
+    const cached = getCachedLists(householdId);
+    if (cached.length) setLists(cached);
+  }, [householdId]);
+
+  useEffect(() => {
+    if (!householdId) return;
+    setCachedLists(householdId, lists);
+  }, [householdId, lists]);
 
   useEffect(() => {
     void refetch();
@@ -111,9 +133,24 @@ export function useLists(
       lastLocalMutationAt.current = Date.now();
       const now = new Date().toISOString();
       if (isOfflineNow()) {
-        setError("Офлайн: создание списка недоступно без сети");
-        pushToast("Офлайн: список можно создать только при сети");
-        return null;
+        const tempId = `local_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        const row: ShoppingList = {
+          id: tempId,
+          household_id: householdId,
+          title: title.trim(),
+          created_at: now,
+          updated_at: now,
+        };
+        setLists((current) => [row, ...current]);
+        enqueueOfflineOp("lists.create", {
+          tempId,
+          householdId,
+          title: title.trim(),
+          createdAt: now,
+          updatedAt: now,
+        });
+        pushToast("Офлайн: список добавлен в очередь синхронизации");
+        return row;
       }
       const { data, error } = await supabase
         .from("lists")
@@ -123,9 +160,24 @@ export function useLists(
 
       if (error) {
         if (isLikelyOfflineError(error.message)) {
-          setError("Офлайн: создание списка недоступно без сети");
-          pushToast("Офлайн: список можно создать только при сети");
-          return null;
+          const tempId = `local_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+          const row: ShoppingList = {
+            id: tempId,
+            household_id: householdId,
+            title: title.trim(),
+            created_at: now,
+            updated_at: now,
+          };
+          setLists((current) => [row, ...current]);
+          enqueueOfflineOp("lists.create", {
+            tempId,
+            householdId,
+            title: title.trim(),
+            createdAt: now,
+            updatedAt: now,
+          });
+          pushToast("Офлайн: список добавлен в очередь синхронизации");
+          return row;
         }
         setError(error.message);
         return null;
@@ -178,6 +230,21 @@ export function useLists(
     },
     [householdId, pushToast, refetch],
   );
+
+  useEffect(() => {
+    if (!householdId) return;
+    return subscribeOfflineApplied((e) => {
+      const r: any = e.result;
+      if (!r || r.kind !== "lists.create") return;
+      if (r.householdId !== householdId) return;
+      const tempId: string = r.tempId;
+      const serverId: string = r.serverId;
+      if (!tempId || !serverId) return;
+      setOfflineIdMap(tempId, serverId);
+      setLists((current) => current.map((l) => (l.id === tempId ? { ...l, id: serverId } : l)));
+      migrateItemsCache(tempId, serverId);
+    });
+  }, [householdId]);
 
   return {
     lists,

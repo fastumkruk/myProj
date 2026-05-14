@@ -30,12 +30,15 @@ create table if not exists items (
   title text not null,
   is_checked boolean not null default false,
   position int not null default 0,
+  price numeric,
   updated_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create index if not exists items_list_id_idx on items(list_id);
+
+alter table items add column if not exists price numeric;
 
 alter table households enable row level security;
 alter table household_members enable row level security;

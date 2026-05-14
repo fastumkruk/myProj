@@ -3,6 +3,7 @@ import { setOfflineIdMap } from "@/lib/offlineQueue";
 
 type ExecResult =
   | { kind: "items.add"; listId: string; tempId: string; serverId: string }
+  | { kind: "lists.create"; householdId: string; tempId: string; serverId: string }
   | { kind: string };
 
 export function createOfflineExecutor() {
@@ -22,6 +23,7 @@ export function createOfflineExecutor() {
           list_id: listId,
           title: String(p.title ?? "").trim(),
           position: Number(p.position ?? 0),
+          price: p.price ?? null,
           updated_at: p.updatedAt ?? new Date().toISOString(),
           updated_by: p.updatedBy ?? null,
         })
@@ -33,6 +35,26 @@ export function createOfflineExecutor() {
       const tempId = String(p.tempId ?? "");
       if (tempId) setOfflineIdMap(tempId, serverId);
       return { kind: "items.add", listId, tempId, serverId };
+    }
+
+    if (op.kind === "lists.create") {
+      const householdId = String(p.householdId ?? "");
+      if (!householdId) throw new Error("Missing householdId");
+      const { data, error } = await supabase
+        .from("lists")
+        .insert({
+          household_id: householdId,
+          title: String(p.title ?? "").trim(),
+          updated_at: p.updatedAt ?? new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(error.message);
+      const serverId = String((data as any)?.id ?? "");
+      if (!serverId) throw new Error("Server id missing");
+      const tempId = String(p.tempId ?? "");
+      if (tempId) setOfflineIdMap(tempId, serverId);
+      return { kind: "lists.create", householdId, tempId, serverId };
     }
 
     if (op.kind === "items.toggle") {
@@ -63,6 +85,21 @@ export function createOfflineExecutor() {
         .eq("id", itemId);
       if (error) throw new Error(error.message);
       return { kind: "items.rename" };
+    }
+
+    if (op.kind === "items.setPrice") {
+      const itemId = helpers.resolveId(p.itemId);
+      if (!itemId) throw new Error("Missing itemId mapping");
+      const { error } = await supabase
+        .from("items")
+        .update({
+          price: p.price ?? null,
+          updated_at: p.updatedAt ?? new Date().toISOString(),
+          updated_by: p.updatedBy ?? null,
+        })
+        .eq("id", itemId);
+      if (error) throw new Error(error.message);
+      return { kind: "items.setPrice" };
     }
 
     if (op.kind === "items.delete") {
@@ -99,4 +136,3 @@ export function createOfflineExecutor() {
     throw new Error(`Unknown offline op: ${op.kind}`);
   };
 }
-

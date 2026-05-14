@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { enqueueOfflineOp, subscribeOfflineApplied } from "@/lib/offlineQueue";
 import { isLikelyOfflineError, isOfflineNow } from "@/lib/offlineUtils";
+import { getCachedItems, setCachedItems } from "@/lib/localCache";
 import type { ShoppingItem } from "@/types/models";
 import { useToastStore } from "@/stores/toastStore";
 
@@ -20,6 +21,7 @@ type State = {
   addItem: (title: string) => Promise<ShoppingItem | null>;
   toggleItem: (itemId: string, isChecked: boolean) => Promise<void>;
   renameItem: (itemId: string, title: string) => Promise<void>;
+  setItemPrice: (itemId: string, price: number | null) => Promise<void>;
   deleteItem: (itemId: string) => Promise<void>;
   clearChecked: () => Promise<void>;
   refetch: () => Promise<void>;
@@ -58,13 +60,33 @@ export function useItems(
 
       if (error) {
         setError(error.message);
+        if (isLikelyOfflineError(error.message)) {
+          setItems(getCachedItems(listId));
+        }
         return;
       }
-      setItems((data ?? []) as ShoppingItem[]);
+      const next = (data ?? []) as ShoppingItem[];
+      setItems(next);
+      setCachedItems(listId, next);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      setItems(getCachedItems(listId));
     } finally {
       setIsLoading(false);
     }
   }, [listId]);
+
+  useEffect(() => {
+    if (!listId) return;
+    const cached = getCachedItems(listId);
+    if (cached.length) setItems(cached);
+  }, [listId]);
+
+  useEffect(() => {
+    if (!listId) return;
+    setCachedItems(listId, items);
+  }, [listId, items]);
 
   useEffect(() => {
     void refetch();
@@ -152,6 +174,7 @@ export function useItems(
           title: title.trim(),
           position,
           is_checked: false,
+          price: null,
           updated_by: userId ?? null,
           created_at: now,
           updated_at: now,
@@ -162,6 +185,7 @@ export function useItems(
           listId,
           title: title.trim(),
           position,
+          price: null,
           updatedAt: now,
           updatedBy: userId ?? null,
         });
@@ -183,6 +207,7 @@ export function useItems(
             title: title.trim(),
             position,
             is_checked: false,
+            price: null,
             updated_by: userId ?? null,
             created_at: now,
             updated_at: now,
@@ -193,6 +218,7 @@ export function useItems(
             listId,
             title: title.trim(),
             position,
+            price: null,
             updatedAt: now,
             updatedBy: userId ?? null,
           });
@@ -208,6 +234,44 @@ export function useItems(
       return row;
     },
     [listId, items, userId],
+  );
+
+  const setItemPrice = useCallback(
+    async (itemId: string, price: number | null) => {
+      if (!supabase || !listId) return;
+      setError(null);
+      const now = new Date().toISOString();
+      setItems((current) =>
+        current.map((i) =>
+          i.id === itemId ? { ...i, price: price ?? null, updated_at: now, updated_by: userId ?? null } : i,
+        ),
+      );
+      const { error } = await supabase
+        .from("items")
+        .update({ price: price ?? null, updated_at: now, updated_by: userId ?? null })
+        .eq("id", itemId);
+      if (error) {
+        if (error.message.toLowerCase().includes("price") && error.message.toLowerCase().includes("does not exist")) {
+          pushToast("Нужно добавить колонку price в Supabase (миграция)");
+          setError(error.message);
+          await refetch();
+          return;
+        }
+        if (isLikelyOfflineError(error.message)) {
+          enqueueOfflineOp("items.setPrice", {
+            itemId,
+            price: price ?? null,
+            updatedAt: now,
+            updatedBy: userId ?? null,
+          });
+          pushToast("Офлайн: сумму сохраню позже");
+          return;
+        }
+        setError(error.message);
+        await refetch();
+      }
+    },
+    [listId, refetch, userId, pushToast],
   );
 
   const toggleItem = useCallback(
@@ -313,6 +377,7 @@ export function useItems(
     addItem,
     toggleItem,
     renameItem,
+    setItemPrice,
     deleteItem,
     clearChecked,
     refetch,

@@ -6,11 +6,13 @@ export default function ItemRow({
   item,
   onToggle,
   onRename,
+  onPrice,
   onDelete,
 }: {
   item: ShoppingItem;
   onToggle: (isChecked: boolean) => void;
   onRename: () => void;
+  onPrice: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -27,6 +29,14 @@ export default function ItemRow({
       </button>
 
       <div className="flex items-center gap-2">
+        {typeof item.price === "number" ? (
+          <div className="rounded-xl bg-emerald-500/10 px-2.5 py-1 text-[12px] font-semibold tracking-tight text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200">
+            ₽{item.price}
+          </div>
+        ) : null}
+        <Button variant="ghost" className="h-9 w-9 rounded-xl px-0" onClick={onPrice} aria-label="Сумма">
+          <span className="text-[16px] leading-none">💰</span>
+        </Button>
         <Button variant="ghost" className="h-9 w-9 rounded-xl px-0" onClick={onRename} aria-label="Редактировать">
           <Pencil className="h-4 w-4" />
         </Button>
