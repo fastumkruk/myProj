@@ -15,21 +15,11 @@ export default function ItemRow({
 }) {
   return (
     <div className="group flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-black/5 dark:hover:bg-white/10">
-      <button
-        type="button"
-        onClick={() => onToggle(!item.is_checked)}
-        className={[
-          "flex h-8 w-8 items-center justify-center rounded-xl transition",
-          item.is_checked ? "bg-sky-500/15 ring-1 ring-sky-500/35" : "bg-black/5 ring-1 ring-black/10 dark:bg-white/10 dark:ring-white/10",
-        ].join(" ")}
-        aria-label={item.is_checked ? "Снять отметку" : "Отметить как куплено"}
-      />
-
       <button type="button" onClick={() => onToggle(!item.is_checked)} className="min-w-0 flex-1 text-left">
         <div
           className={[
-            "truncate text-[15px] font-semibold tracking-tight",
-            item.is_checked ? "text-zinc-400 line-through dark:text-white/35" : "",
+            "truncate text-[14px] font-semibold tracking-tight",
+            item.is_checked ? "text-zinc-400 line-through dark:text-white/35" : "text-zinc-900 dark:text-zinc-100",
           ].join(" ")}
         >
           {item.title}

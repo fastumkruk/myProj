@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import AppShell from "@/components/AppShell";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Surface from "@/components/ui/Surface";
+import { createCaptcha } from "@/lib/captcha";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 
@@ -19,9 +21,19 @@ export default function Login() {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [captcha, setCaptcha] = useState(() => createCaptcha());
+  const [captchaValue, setCaptchaValue] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const canSubmit = useMemo(() => email.trim().length > 3 && password.length >= 6, [email, password]);
+
+  useEffect(() => {
+    setLocalError(null);
+    setCaptcha(createCaptcha());
+    setCaptchaValue("");
+  }, [mode]);
 
   if (!isSupabaseConfigured) return <Navigate to="/not-configured" replace />;
   if (user && householdId) return <Navigate to="/lists" replace />;
@@ -29,6 +41,18 @@ export default function Login() {
 
   const onSubmit = async () => {
     if (!canSubmit || isBusy) return;
+    setLocalError(null);
+
+    if (mode === "signup") {
+      const value = Number(captchaValue.trim());
+      if (!Number.isFinite(value) || value !== captcha.answer) {
+        setLocalError("Капча неверна");
+        setCaptcha(createCaptcha());
+        setCaptchaValue("");
+        return;
+      }
+    }
+
     setIsBusy(true);
     try {
       if (mode === "signin") {
@@ -80,16 +104,36 @@ export default function Login() {
           <Input
             label="Пароль"
             name="password"
-            type="password"
+            type={isPasswordVisible ? "text" : "password"}
             autoComplete={mode === "signin" ? "current-password" : "new-password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Минимум 6 символов"
+            right={
+              <button
+                type="button"
+                className="flex h-8 w-8 items-center justify-center rounded-xl hover:bg-black/5 dark:hover:bg-white/10"
+                onClick={() => setIsPasswordVisible((v) => !v)}
+                aria-label={isPasswordVisible ? "Скрыть пароль" : "Показать пароль"}
+              >
+                {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            }
           />
 
-          {error ? (
-            <div className="rounded-2xl bg-rose-500/10 px-4 py-3 text-[13px] text-rose-700 dark:bg-rose-500/15 dark:text-rose-200">
-              {error}
+          {mode === "signup" ? (
+            <Input
+              label={`Капча: ${captcha.a} + ${captcha.b} = ?`}
+              value={captchaValue}
+              onChange={(e) => setCaptchaValue(e.target.value)}
+              inputMode="numeric"
+              placeholder="Ответ"
+            />
+          ) : null}
+
+          {localError || error ? (
+            <div className="rounded-2xl bg-rose-500/10 px-4 py-3 text-[12px] text-rose-700 dark:bg-rose-500/15 dark:text-rose-200">
+              {localError ?? error}
             </div>
           ) : null}
 
@@ -97,7 +141,7 @@ export default function Login() {
             {mode === "signin" ? "Войти" : "Создать аккаунт"}
           </Button>
 
-          <div className="text-center text-[12px] leading-relaxed text-zinc-500 dark:text-white/55">
+          <div className="text-center text-[11px] leading-relaxed text-zinc-500 dark:text-white/55">
             Для синхронизации нужен интернет. Офлайн-режим в v1 — просмотр кэша и индикатор статуса.
           </div>
         </div>
@@ -105,4 +149,3 @@ export default function Login() {
     </AppShell>
   );
 }
-

@@ -44,6 +44,18 @@ export function useLists(householdId: string | null): State {
 
   useEffect(() => {
     if (!supabase || !householdId) return;
+    const intervalId = window.setInterval(() => {
+      if (!navigator.onLine) return;
+      void refetch();
+    }, 3000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [householdId, refetch]);
+
+  useEffect(() => {
+    if (!supabase || !householdId) return;
 
     const channel = supabase
       .channel(`lists:${householdId}`)

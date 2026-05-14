@@ -17,8 +17,8 @@ export default function ListRow({
     <div className="group flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-black/5 dark:hover:bg-white/10">
       <button type="button" onClick={onOpen} className="flex flex-1 items-center gap-3 text-left">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[15px] font-semibold tracking-tight">{list.title}</div>
-          <div className="mt-0.5 text-[12px] text-zinc-500 dark:text-white/50">
+          <div className="truncate text-[14px] font-semibold tracking-tight">{list.title}</div>
+          <div className="mt-0.5 text-[11px] text-zinc-500 dark:text-white/50">
             Обновлено {new Date(list.updated_at).toLocaleString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
           </div>
         </div>
@@ -36,4 +36,3 @@ export default function ListRow({
     </div>
   );
 }
-

@@ -7,6 +7,7 @@ import ListDetails from "@/pages/ListDetails";
 import NotConfigured from "@/pages/NotConfigured";
 import AuthGate from "@/components/AuthGate";
 import ThemeBootstrap from "@/components/ThemeBootstrap";
+import ToastHost from "@/components/ToastHost";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="*" element={<Home />} />
         </Routes>
       </Router>
+      <ToastHost />
     </AuthGate>
   );
 }

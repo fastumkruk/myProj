@@ -20,7 +20,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(
         className={cn(
           "inline-flex items-center justify-center gap-2 rounded-2xl px-4 font-medium tracking-tight transition active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 focus-visible:ring-offset-0",
-          size === "lg" ? "h-12 text-[15px]" : "h-10 text-[14px]",
+          size === "lg" ? "h-12 text-[14px]" : "h-10 text-[13px]",
           variant === "primary" &&
             "bg-sky-500 text-white shadow-[0_10px_28px_rgba(14,165,233,0.35)] hover:bg-sky-400",
           variant === "secondary" &&

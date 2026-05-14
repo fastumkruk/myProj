@@ -1,4 +1,4 @@
-import { Plus, LogOut, RefreshCw } from "lucide-react";
+import { Bell, LogOut, Plus, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppShell from "@/components/AppShell";
@@ -9,11 +9,13 @@ import Input from "@/components/ui/Input";
 import Surface from "@/components/ui/Surface";
 import { useLists } from "@/hooks/useLists";
 import { useAuthStore } from "@/stores/authStore";
+import { useToastStore } from "@/stores/toastStore";
 
 export default function Lists() {
   const navigate = useNavigate();
   const householdId = useAuthStore((s) => s.householdId);
   const signOut = useAuthStore((s) => s.signOut);
+  const toast = useToastStore((s) => s.push);
   const { lists, isLoading, error, createList, renameList, deleteList, refetch } = useLists(householdId);
 
   const [newTitle, setNewTitle] = useState("");
@@ -45,12 +47,33 @@ export default function Lists() {
     await deleteList(listId);
   };
 
+  const onEnableNotifications = async () => {
+    if (typeof Notification === "undefined") {
+      toast("Уведомления не поддерживаются");
+      return;
+    }
+    if (Notification.permission === "granted") {
+      toast("Уведомления уже включены");
+      return;
+    }
+    const res = await Notification.requestPermission();
+    toast(res === "granted" ? "Уведомления включены" : "Уведомления отключены");
+  };
+
   return (
     <ProtectedRoute requireHousehold>
       <AppShell
         title="Списки"
         right={
           <>
+            <Button
+              variant="ghost"
+              className="h-9 w-9 rounded-2xl px-0"
+              onClick={() => void onEnableNotifications()}
+              aria-label="Уведомления"
+            >
+              <Bell className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               className="h-9 w-9 rounded-2xl px-0"
@@ -108,4 +131,3 @@ export default function Lists() {
     </ProtectedRoute>
   );
 }
-

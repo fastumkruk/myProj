@@ -3,10 +3,12 @@ import { cn } from "@/lib/utils";
 
 export default function AppShell({
   title,
+  left,
   right,
   children,
 }: {
   title?: string;
+  left?: ReactNode;
   right?: ReactNode;
   children: ReactNode;
 }) {
@@ -26,7 +28,10 @@ export default function AppShell({
         {title ? (
           <div className="sticky top-[max(12px,env(safe-area-inset-top))] z-10 mb-4">
             <div className="flex items-center justify-between rounded-3xl bg-white/70 px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.10)] backdrop-blur-xl dark:bg-white/5 dark:shadow-[0_18px_40px_rgba(0,0,0,0.45)]">
-              <div className="text-[15px] font-semibold tracking-tight">{title}</div>
+              <div className="flex min-w-0 items-center gap-2">
+                {left ? <div className="flex items-center gap-2">{left}</div> : null}
+                <div className="truncate text-[14px] font-semibold tracking-tight">{title}</div>
+              </div>
               <div className="flex items-center gap-2">{right}</div>
             </div>
           </div>

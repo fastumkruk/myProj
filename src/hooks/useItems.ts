@@ -22,10 +22,18 @@ type State = {
   refetch: () => Promise<void>;
 };
 
-export function useItems(listId: string | null): State {
+export function useItems(
+  listId: string | null,
+  opts?: {
+    userId?: string;
+    onRemoteChange?: () => void;
+  },
+): State {
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const userId = opts?.userId;
+  const onRemoteChange = opts?.onRemoteChange;
 
   const refetch = useCallback(async () => {
     if (!supabase || !listId) return;
@@ -53,6 +61,18 @@ export function useItems(listId: string | null): State {
   useEffect(() => {
     void refetch();
   }, [refetch]);
+
+  useEffect(() => {
+    if (!supabase || !listId) return;
+    const intervalId = window.setInterval(() => {
+      if (!navigator.onLine) return;
+      void refetch();
+    }, 3000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [listId, refetch]);
 
   useEffect(() => {
     if (!supabase || !listId) return;
@@ -84,6 +104,10 @@ export function useItems(listId: string | null): State {
               return a.updated_at < b.updated_at ? 1 : -1;
             });
           });
+
+          if (userId && next?.updated_by && next.updated_by !== userId) {
+            onRemoteChange?.();
+          }
         },
       )
       .subscribe();
@@ -91,7 +115,7 @@ export function useItems(listId: string | null): State {
     return () => {
       void channel.unsubscribe();
     };
-  }, [listId]);
+  }, [listId, userId, onRemoteChange]);
 
   const addItem = useCallback(
     async (title: string) => {
@@ -101,7 +125,7 @@ export function useItems(listId: string | null): State {
       const now = new Date().toISOString();
       const { data, error } = await supabase
         .from("items")
-        .insert({ list_id: listId, title: title.trim(), position, updated_at: now })
+        .insert({ list_id: listId, title: title.trim(), position, updated_at: now, updated_by: userId ?? null })
         .select("*")
         .single();
 
@@ -114,7 +138,7 @@ export function useItems(listId: string | null): State {
       setItems((current) => [...current, row]);
       return row;
     },
-    [listId, items],
+    [listId, items, userId],
   );
 
   const toggleItem = useCallback(
@@ -126,13 +150,16 @@ export function useItems(listId: string | null): State {
         const next = current.map((i) => (i.id === itemId ? { ...i, is_checked: isChecked, updated_at: now } : i));
         return sortItems(next);
       });
-      const { error } = await supabase.from("items").update({ is_checked: isChecked, updated_at: now }).eq("id", itemId);
+      const { error } = await supabase
+        .from("items")
+        .update({ is_checked: isChecked, updated_at: now, updated_by: userId ?? null })
+        .eq("id", itemId);
       if (error) {
         setError(error.message);
         await refetch();
       }
     },
-    [listId, refetch],
+    [listId, refetch, userId],
   );
 
   const renameItem = useCallback(
@@ -140,10 +167,13 @@ export function useItems(listId: string | null): State {
       if (!supabase || !listId) return;
       setError(null);
       const now = new Date().toISOString();
-      const { error } = await supabase.from("items").update({ title: title.trim(), updated_at: now }).eq("id", itemId);
+      const { error } = await supabase
+        .from("items")
+        .update({ title: title.trim(), updated_at: now, updated_by: userId ?? null })
+        .eq("id", itemId);
       if (error) setError(error.message);
     },
-    [listId],
+    [listId, userId],
   );
 
   const deleteItem = useCallback(
