@@ -1,4 +1,19 @@
-<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="32" height="32" fill="#0A0B0D"/>
-<path d="M26.6677 23.7149H8.38057V20.6496H5.33301V8.38159H26.6677V23.7149ZM8.38057 20.6496H23.6201V11.4482H8.38057V20.6496ZM16.0011 16.0021L13.8461 18.1705L11.6913 16.0021L13.8461 13.8337L16.0011 16.0021ZM22.0963 16.0008L19.9414 18.1691L17.7865 16.0008L19.9414 13.8324L22.0963 16.0008Z" fill="#32F08C"/>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0EA5E9"/>
+      <stop offset="0.55" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#F97316"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="120" y1="120" x2="392" y2="392" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#bg)"/>
+  <path d="M150 170C150 156.745 160.745 146 174 146H338C351.255 146 362 156.745 362 170V346C362 359.255 351.255 370 338 370H174C160.745 370 150 359.255 150 346V170Z" fill="#0A0B0D" fill-opacity="0.26"/>
+  <path d="M150 170C150 156.745 160.745 146 174 146H338C351.255 146 362 156.745 362 170V346C362 359.255 351.255 370 338 370H174C160.745 370 150 359.255 150 346V170Z" fill="url(#shine)"/>
+  <path d="M206 226H318" stroke="white" stroke-opacity="0.85" stroke-width="18" stroke-linecap="round"/>
+  <path d="M206 290H318" stroke="white" stroke-opacity="0.7" stroke-width="18" stroke-linecap="round"/>
+  <path d="M190 258L214 282L270 226" stroke="white" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
