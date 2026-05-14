@@ -1,4 +1,4 @@
-import { Check, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import type { ShoppingItem } from "@/types/models";
 import Button from "@/components/ui/Button";
 
@@ -20,12 +20,10 @@ export default function ItemRow({
         onClick={() => onToggle(!item.is_checked)}
         className={[
           "flex h-8 w-8 items-center justify-center rounded-xl transition",
-          item.is_checked ? "bg-sky-500 text-white" : "bg-black/5 text-zinc-400 dark:bg-white/10 dark:text-white/35",
+          item.is_checked ? "bg-sky-500/15 ring-1 ring-sky-500/35" : "bg-black/5 ring-1 ring-black/10 dark:bg-white/10 dark:ring-white/10",
         ].join(" ")}
         aria-label={item.is_checked ? "Снять отметку" : "Отметить как куплено"}
-      >
-        <Check className={["h-4 w-4 transition", item.is_checked ? "opacity-100" : "opacity-0"].join(" ")} />
-      </button>
+      />
 
       <button type="button" onClick={() => onToggle(!item.is_checked)} className="min-w-0 flex-1 text-left">
         <div
@@ -49,4 +47,3 @@ export default function ItemRow({
     </div>
   );
 }
-

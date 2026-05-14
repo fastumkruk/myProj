@@ -1,5 +1,3 @@
-create extension if not exists pgcrypto;
-
 create table if not exists households (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -122,7 +120,10 @@ begin
     raise exception 'not_authenticated';
   end if;
 
-  v_invite_code := upper(substr(encode(gen_random_bytes(8), 'hex'), 1, 8));
+  loop
+    v_invite_code := upper(substr(md5(random()::text || clock_timestamp()::text), 1, 8));
+    exit when not exists (select 1 from households h where h.invite_code = v_invite_code);
+  end loop;
 
   insert into households (name, invite_code, created_by)
   values (p_name, v_invite_code, auth.uid())

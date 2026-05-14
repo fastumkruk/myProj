@@ -2,6 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { ShoppingItem } from "@/types/models";
 
+function sortItems(next: ShoppingItem[]) {
+  return next.sort((a, b) => {
+    if (a.is_checked !== b.is_checked) return a.is_checked ? 1 : -1;
+    if (a.position !== b.position) return a.position - b.position;
+    return a.updated_at < b.updated_at ? 1 : -1;
+  });
+}
+
 type State = {
   items: ShoppingItem[];
   isLoading: boolean;
@@ -114,10 +122,17 @@ export function useItems(listId: string | null): State {
       if (!supabase || !listId) return;
       setError(null);
       const now = new Date().toISOString();
+      setItems((current) => {
+        const next = current.map((i) => (i.id === itemId ? { ...i, is_checked: isChecked, updated_at: now } : i));
+        return sortItems(next);
+      });
       const { error } = await supabase.from("items").update({ is_checked: isChecked, updated_at: now }).eq("id", itemId);
-      if (error) setError(error.message);
+      if (error) {
+        setError(error.message);
+        await refetch();
+      }
     },
-    [listId],
+    [listId, refetch],
   );
 
   const renameItem = useCallback(
